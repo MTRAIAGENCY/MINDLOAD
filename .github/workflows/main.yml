@@ -16,16 +16,31 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
+      - name: پیدا کردن مسیر واقعی پروژه
+        id: locate
+        run: |
+          PROJECT_FILE=$(find . -maxdepth 5 -name "pubspec.yaml" -not -path "*/build/*" | head -n 1)
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "pubspec.yaml پیدا نشد!"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          echo "پروژه اینجا پیدا شد: $PROJECT_DIR"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
       - name: ساخت پوشه‌های اندروید (در صورت نبود)
+        working-directory: ${{ steps.locate.outputs.dir }}
         run: |
           if [ ! -d "android" ]; then
             flutter create . --project-name mindload --org com.mindload.app --platforms=android
           fi
 
       - name: نصب پکیج‌ها
+        working-directory: ${{ steps.locate.outputs.dir }}
         run: flutter pub get
 
       - name: افزودن دسترسی‌های لازم به AndroidManifest
+        working-directory: ${{ steps.locate.outputs.dir }}
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if ! grep -q "RECORD_AUDIO" "$MANIFEST"; then
@@ -33,10 +48,11 @@ jobs:
           fi
 
       - name: ساخت APK
+        working-directory: ${{ steps.locate.outputs.dir }}
         run: flutter build apk --release
 
       - name: آپلود APK به عنوان Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mindload-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: ${{ steps.locate.outputs.dir }}/build/app/outputs/flutter-apk/app-release.apk
